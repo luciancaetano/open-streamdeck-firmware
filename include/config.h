@@ -3,6 +3,10 @@
 // Open StreamDeck - Configuration
 // ESP32 DOIT DevKit V1 | 12 Buttons + 1 Rotary Encoder + Optional RGB LEDs
 // ============================================================================
+//
+// All hardware pin mappings, timing constants, and feature toggles live here.
+// Modify this file to adapt the firmware to different hardware configurations.
+// ============================================================================
 
 #include <Arduino.h>
 
@@ -27,7 +31,8 @@
 #define LONG_PRESS_MS         600     // Long-press threshold
 
 // GPIO pins for 12 buttons - mapped to safe ESP32 DOIT DevKit V1 GPIOs
-// Avoids: GPIO0 (boot), GPIO2 (onboard LED), GPIO6-11 (flash), GPIO34-39 (input-only, no pull-up)
+// Avoids: GPIO0 (boot), GPIO2 (onboard LED), GPIO6-11 (flash),
+//         GPIO34-39 (input-only, no pull-up)
 static const uint8_t BUTTON_PINS[NUM_BUTTONS] = {
     4,    // BTN 0
     5,    // BTN 1
@@ -44,21 +49,33 @@ static const uint8_t BUTTON_PINS[NUM_BUTTONS] = {
 };
 
 // ----------------------------------------------------------------------------
-// Rotary Encoder Configuration
+// Rotary Encoder / Knob Configuration
 // ----------------------------------------------------------------------------
-#define ENCODER_PIN_A         32      // CLK
-#define ENCODER_PIN_B         33      // DT
-#define ENCODER_BTN_PIN       25      // SW (push button on encoder)
-#define ENCODER_DEBOUNCE_MS   30      // Debounce for encoder button
-#define ENCODER_THRESHOLD     1       // Minimum count change to register a tick
+// Each knob is defined by its pins and a string ID used in JSON events.
+// To add more knobs, increase NUM_KNOBS and extend the KNOB_CONFIGS array.
+
+#define NUM_KNOBS             1
+#define ENCODER_DEBOUNCE_MS   30      // Debounce for encoder push button
+#define ENCODER_THRESHOLD     1       // Minimum count delta to register a tick
+
+struct KnobConfig {
+    const char* id;       // JSON identifier (e.g. "volume")
+    uint8_t     pinA;     // CLK pin
+    uint8_t     pinB;     // DT pin
+    uint8_t     btnPin;   // SW (push button) pin
+};
+
+static const KnobConfig KNOB_CONFIGS[NUM_KNOBS] = {
+    { "volume", 32, 33, 25 },
+};
 
 // ----------------------------------------------------------------------------
 // RGB LED Configuration (WS2812B / NeoPixel via FastLED)
 // ----------------------------------------------------------------------------
-#define LED_ENABLED           0       // Set to 0 to disable LED support entirely
+#define LED_ENABLED           0       // Set to 1 to enable LED support
 #define LED_DATA_PIN          26      // Data pin for WS2812B strip
 #define NUM_LEDS              12      // One LED per button
-#define LED_BRIGHTNESS        40      // Default brightness (0-255), low for power saving
+#define LED_BRIGHTNESS        40      // Default brightness (0-255)
 #define LED_TYPE              WS2812B
 #define LED_COLOR_ORDER       GRB
 
