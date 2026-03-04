@@ -11,12 +11,9 @@
 #include <Arduino.h>
 
 // ----------------------------------------------------------------------------
-// BLE Configuration
+// Bluetooth Classic Configuration
 // ----------------------------------------------------------------------------
-#define BLE_DEVICE_NAME       "OpenStreamDeck"
-#define BLE_SERVICE_UUID      "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"  // Nordic UART
-#define BLE_TX_CHAR_UUID      "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // TX (notify)
-#define BLE_RX_CHAR_UUID      "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  // RX (write)
+#define BT_DEVICE_NAME        "OpenStreamDeck"
 
 // ----------------------------------------------------------------------------
 // USB Serial Configuration
@@ -108,8 +105,6 @@ static const SliderConfig SLIDER_CONFIGS[NUM_SLIDERS] = {
 // ----------------------------------------------------------------------------
 #define IDLE_TIMEOUT_MS       30000   // Enter light sleep after 30s of inactivity
 #define SLEEP_CHECK_INTERVAL  1000    // How often to check idle state (ms)
-#define BLE_ADV_INTERVAL_MIN  160     // 100ms  (units of 0.625ms)
-#define BLE_ADV_INTERVAL_MAX  320     // 200ms  (units of 0.625ms)
 
 // ----------------------------------------------------------------------------
 // Scan & Loop Timing

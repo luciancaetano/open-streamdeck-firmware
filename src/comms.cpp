@@ -8,7 +8,7 @@
 // ============================================================================
 
 #include "comms.h"
-#include "ble_serial.h"
+#include "bt_serial.h"
 #include "usb_serial.h"
 #include <ArduinoJson.h>
 
@@ -19,7 +19,7 @@ static CommsCommandCallback cmdCb = nullptr;
 // ----------------------------------------------------------------------------
 static void broadcast(const char* data) {
     usb_send(data);
-    ble_send(data);
+    bt_send(data);
 }
 
 // ----------------------------------------------------------------------------
@@ -67,11 +67,11 @@ static void onRawRx(const char* line) {
 
 void comms_init() {
     usb_init();
-    ble_init();
+    bt_init();
 
     // Wire both transports to our internal decoder
     usb_set_rx_callback(onRawRx);
-    ble_set_rx_callback(onRawRx);
+    bt_set_rx_callback(onRawRx);
 }
 
 void comms_set_command_callback(CommsCommandCallback cb) {
@@ -80,7 +80,7 @@ void comms_set_command_callback(CommsCommandCallback cb) {
 
 void comms_process_rx() {
     usb_process_rx();
-    ble_process_rx();
+    bt_process_rx();
 }
 
 void comms_send_event(const char* json) {
@@ -98,12 +98,12 @@ void comms_send_heartbeat(uint32_t uptimeSeconds) {
     StaticJsonDocument<JSON_TX_BUFFER_SIZE> doc;
     doc["status"] = "alive";
     doc["uptime"] = uptimeSeconds;
-    doc["ble"]    = ble_is_connected();
+    doc["bt"]    = bt_is_connected();
     char buf[JSON_TX_BUFFER_SIZE];
     serializeJson(doc, buf);
     broadcast(buf);
 }
 
-bool comms_ble_connected() {
-    return ble_is_connected();
+bool comms_bt_connected() {
+    return bt_is_connected();
 }

@@ -54,4 +54,4 @@ void comms_send_response(const char* json);
 void comms_send_heartbeat(uint32_t uptimeSeconds);
 
 // Returns true if a BLE client is currently connected.
-bool comms_ble_connected();
+bool comms_bt_connected();

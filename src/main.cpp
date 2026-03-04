@@ -1,6 +1,6 @@
 // ============================================================================
 // Open StreamDeck Firmware - Main Entry Point
-// ESP32 DOIT DevKit V1 | 12 Buttons + Rotary Encoder + BLE/USB Serial
+// ESP32 DOIT DevKit V1 | 12 Buttons + Rotary Encoder + BT/USB Serial
 // ============================================================================
 //
 // This file wires all modules together:
@@ -90,7 +90,7 @@ static const char* onCommand(const char* json) {
 // Power Management
 // ----------------------------------------------------------------------------
 static void checkIdleSleep() {
-    if (comms_ble_connected()) return;
+    if (comms_bt_connected()) return;
     if (Serial.available()) return;
 
     uint32_t idleMs = millis() - lastActivityMs;
