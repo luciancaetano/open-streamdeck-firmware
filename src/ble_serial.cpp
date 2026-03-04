@@ -60,6 +60,7 @@ void ble_init() {
 
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->addServiceUUID(BLE_SERVICE_UUID);
+    adv->setScanResponse(true);
     adv->setMinInterval(BLE_ADV_INTERVAL_MIN);
     adv->setMaxInterval(BLE_ADV_INTERVAL_MAX);
     adv->start();
