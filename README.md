@@ -1,6 +1,17 @@
-# Open StreamDeck
+<p align="center">
+  <img src="logo.svg" alt="Open StreamDeck" width="480"/>
+</p>
 
-An open-source, fully customizable macro deck built on the ESP32. No subscriptions, no locked-down software, no cloud dependency. **You own every layer — hardware, firmware, and software.**
+<p align="center">
+  <em>An open-source, fully customizable macro deck built on the ESP32.<br/>No subscriptions, no locked-down software, no cloud dependency.<br/><strong>You own every layer — hardware, firmware, and software.</strong></em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-ESP32-blue?style=flat-square" alt="ESP32"/>
+  <img src="https://img.shields.io/badge/protocol-JSON-green?style=flat-square" alt="JSON"/>
+  <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="MIT"/>
+  <img src="https://img.shields.io/badge/connectivity-USB%20%7C%20Bluetooth-cyan?style=flat-square" alt="USB | Bluetooth"/>
+</p>
 
 ## Why Open StreamDeck?
 
