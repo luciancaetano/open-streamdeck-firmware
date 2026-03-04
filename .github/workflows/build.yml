@@ -1,0 +1,56 @@
+name: Build & Release Firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build firmware
+        run: pio run
+
+      - name: Rename binary
+        run: |
+          cp .pio/build/esp32doit-devkit-v1/firmware.bin open-streamdeck-firmware.bin
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-streamdeck-firmware
+          path: open-streamdeck-firmware.bin
+
+      - name: Create Release (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build #${{ github.run_number }}
+          body: |
+            Automated firmware build from commit ${{ github.sha }}.
+
+            **Flash instructions:**
+            ```bash
+            # Using esptool.py
+            esptool.py --chip esp32 --port COMx write_flash 0x10000 open-streamdeck-firmware.bin
+
+            # Using PlatformIO
+            pio run -t upload
+            ```
+          files: open-streamdeck-firmware.bin
+          generate_release_notes: true
