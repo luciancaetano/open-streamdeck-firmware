@@ -74,11 +74,11 @@ void leds_flash_button(int btnIndex) {
 #endif
 }
 
-bool leds_handle_command(const char* json) {
+const char* leds_handle_command(const char* json) {
 #if LED_ENABLED
     StaticJsonDocument<JSON_RX_BUFFER_SIZE> doc;
     DeserializationError err = deserializeJson(doc, json);
-    if (err) return false;
+    if (err) return nullptr;
 
     // Per-button LED color: {"btn": 3, "led": "red"}
     if (doc.containsKey("btn") && doc.containsKey("led")) {
@@ -87,14 +87,14 @@ bool leds_handle_command(const char* json) {
         if (idx >= 0 && idx < NUM_LEDS && colorName) {
             targetColor[idx] = lookupColor(colorName);
         }
-        return true;
+        return "led";
     }
 
     // Global brightness: {"brightness": 80}
     if (doc.containsKey("brightness")) {
         int b = doc["brightness"].as<int>();
         FastLED.setBrightness(constrain(b, 0, 255));
-        return true;
+        return "brightness";
     }
 
     // All LEDs: {"all_leds": "off"}
@@ -106,10 +106,10 @@ bool leds_handle_command(const char* json) {
                 targetColor[i] = color;
             }
         }
-        return true;
+        return "all_leds";
     }
 #endif
-    return false;
+    return nullptr;
 }
 
 void leds_sleep() {

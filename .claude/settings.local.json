@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(~/.platformio/penv/Scripts/pio run)",
-      "Bash(~/.platformio/penv/Scripts/platformio.exe run)"
+      "Bash(~/.platformio/penv/Scripts/platformio.exe run)",
+      "Bash(~/.platformio/penv/Scripts/platformio.exe run -t clean)"
     ]
   }
 }

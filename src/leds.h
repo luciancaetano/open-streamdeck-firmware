@@ -24,8 +24,9 @@ void leds_update();
 void leds_flash_button(int btnIndex);
 
 // Handle an incoming JSON command that may affect LEDs.
-// Returns true if the command was consumed (was LED-related).
-bool leds_handle_command(const char* json);
+// Returns the command key (e.g. "led", "brightness", "all_leds") if handled,
+// or nullptr if the command was not LED-related.
+const char* leds_handle_command(const char* json);
 
 // Dim LEDs to 0 before entering sleep mode.
 void leds_sleep();

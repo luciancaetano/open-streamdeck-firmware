@@ -70,6 +70,25 @@ static const KnobConfig KNOB_CONFIGS[NUM_KNOBS] = {
 };
 
 // ----------------------------------------------------------------------------
+// Slider / Fader Configuration (analog ADC inputs)
+// ----------------------------------------------------------------------------
+// GPIO 34-39 are input-only with 12-bit ADC (0-4095), ideal for potentiometers.
+// Each slider has a threshold: minimum ADC change to emit a new event.
+
+#define NUM_SLIDERS           1
+#define SLIDER_SCAN_INTERVAL  20      // Scan sliders every 20ms
+
+struct SliderConfig {
+    const char* id;         // JSON identifier (e.g. "fader1")
+    uint8_t     adcPin;     // ADC-capable GPIO pin
+    uint16_t    threshold;  // Minimum ADC change to report
+};
+
+static const SliderConfig SLIDER_CONFIGS[NUM_SLIDERS] = {
+    { "fader1", 34, 20 },
+};
+
+// ----------------------------------------------------------------------------
 // RGB LED Configuration (WS2812B / NeoPixel via FastLED)
 // ----------------------------------------------------------------------------
 #define LED_ENABLED           0       // Set to 1 to enable LED support
@@ -99,6 +118,7 @@ static const KnobConfig KNOB_CONFIGS[NUM_KNOBS] = {
 #define ENCODER_SCAN_INTERVAL 2       // Read encoder every 2ms
 #define LED_UPDATE_INTERVAL   16      // ~60fps LED refresh
 #define SERIAL_RX_INTERVAL    10      // Check for incoming commands every 10ms
+#define HEARTBEAT_INTERVAL_MS 5000    // Send status heartbeat every 5 seconds
 
 // ----------------------------------------------------------------------------
 // JSON Buffer Sizes

@@ -4,11 +4,11 @@
 // ============================================================================
 //
 // This file wires all modules together:
-//   buttons    -> scans physical buttons, emits JSON events
-//   knob       -> scans rotary encoders, emits JSON events
-//   ble_serial -> BLE Nordic UART transport (send/receive)
-//   usb_serial -> USB hardware serial transport (send/receive)
-//   leds       -> RGB LED feedback and host-driven color control
+//   buttons  -> scans physical buttons, emits JSON events
+//   knob     -> scans rotary encoders, emits JSON events
+//   slider   -> scans analog faders, emits JSON events
+//   comms    -> centralized protocol layer (encode, decode, ACK, routing)
+//   leds     -> RGB LED feedback and host-driven color control
 //
 // The main loop is non-blocking and timer-gated for each subsystem.
 // ============================================================================
@@ -17,8 +17,8 @@
 #include "config.h"
 #include "buttons.h"
 #include "knob.h"
-#include "ble_serial.h"
-#include "usb_serial.h"
+#include "slider.h"
+#include "comms.h"
 #include "leds.h"
 #include <ArduinoJson.h>
 
@@ -27,10 +27,16 @@
 // ----------------------------------------------------------------------------
 static uint32_t lastButtonScan  = 0;
 static uint32_t lastEncoderScan = 0;
+static uint32_t lastSliderScan  = 0;
 static uint32_t lastLedUpdate   = 0;
 static uint32_t lastSerialRx    = 0;
+static uint32_t lastHeartbeat   = 0;
 static uint32_t lastSleepCheck  = 0;
 static uint32_t lastActivityMs  = 0;
+
+// Heartbeat uptime tracking (survives millis() wrap)
+static uint32_t uptimeSeconds   = 0;
+static uint32_t lastUptimeTick  = 0;
 
 // ----------------------------------------------------------------------------
 // Idle Timer
@@ -40,12 +46,11 @@ static void resetIdleTimer() {
 }
 
 // ----------------------------------------------------------------------------
-// Event Dispatch: send to both USB and BLE, reset idle timer
+// Event Dispatch: send via comms and reset idle timer
 // ----------------------------------------------------------------------------
 static void onInputEvent(const char* json) {
     resetIdleTimer();
-    usb_send(json);
-    ble_send(json);
+    comms_send_event(json);
 }
 
 // ----------------------------------------------------------------------------
@@ -64,23 +69,28 @@ static void onButtonEvent(const char* json) {
 }
 
 // ----------------------------------------------------------------------------
-// Incoming Command Handler (from USB or BLE)
+// Command Handler: try each module, return command name or nullptr.
+// Comms layer handles JSON parsing and ACK generation automatically.
 // ----------------------------------------------------------------------------
-static void onCommand(const char* json) {
+static const char* onCommand(const char* json) {
     resetIdleTimer();
 
-    // Try LED module first; if not consumed, log unknown command
-    if (leds_handle_command(json)) return;
+    // Try LED module
+    const char* cmdName = leds_handle_command(json);
+    if (cmdName) return cmdName;
 
-    Serial.print("[CMD] Unknown command: ");
-    Serial.println(json);
+    // Future modules go here:
+    // cmdName = macros_handle_command(json);
+    // if (cmdName) return cmdName;
+
+    return nullptr;  // Comms will send {"ack":false,"error":"unknown_command"}
 }
 
 // ----------------------------------------------------------------------------
 // Power Management
 // ----------------------------------------------------------------------------
 static void checkIdleSleep() {
-    if (ble_is_connected()) return;
+    if (comms_ble_connected()) return;
     if (Serial.available()) return;
 
     uint32_t idleMs = millis() - lastActivityMs;
@@ -108,19 +118,22 @@ static void checkIdleSleep() {
 // Setup
 // ============================================================================
 void setup() {
-    usb_init();
+    comms_init();           // Initializes USB + BLE transports
     buttons_init();
     knob_init();
+    slider_init();
     leds_init();
-    ble_init();
 
-    // Wire event callbacks
+    // Wire input event callbacks
     buttons_set_callback(onButtonEvent);
     knob_set_callback(onInputEvent);
-    usb_set_rx_callback(onCommand);
-    ble_set_rx_callback(onCommand);
+    slider_set_callback(onInputEvent);
+
+    // Wire command handler (comms handles parse + ACK around it)
+    comms_set_command_callback(onCommand);
 
     lastActivityMs = millis();
+    lastUptimeTick = millis();
 }
 
 // ============================================================================
@@ -140,10 +153,14 @@ void loop() {
         knob_scan_rotation();
     }
 
+    if (now - lastSliderScan >= SLIDER_SCAN_INTERVAL) {
+        lastSliderScan = now;
+        slider_scan();
+    }
+
     if (now - lastSerialRx >= SERIAL_RX_INTERVAL) {
         lastSerialRx = now;
-        usb_process_rx();
-        ble_process_rx();
+        comms_process_rx();
     }
 
 #if LED_ENABLED
@@ -152,6 +169,14 @@ void loop() {
         leds_update();
     }
 #endif
+
+    if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
+        lastHeartbeat = now;
+        // Accumulate elapsed seconds (handles millis wrap)
+        uptimeSeconds += (now - lastUptimeTick) / 1000;
+        lastUptimeTick = now;
+        comms_send_heartbeat(uptimeSeconds);
+    }
 
     if (now - lastSleepCheck >= SLEEP_CHECK_INTERVAL) {
         lastSleepCheck = now;
