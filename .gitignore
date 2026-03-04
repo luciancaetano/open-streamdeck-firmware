@@ -3,3 +3,17 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.claude
+.claude
+*.egg-info
+*.pyc
+__pycache__
+.tox
+docs/_build
+dist
+build
+.cache
+coverage.xml
+.coverage
+htmlcov
+.pytest_cache
