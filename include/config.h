@@ -11,6 +11,12 @@
 #include <Arduino.h>
 
 // ----------------------------------------------------------------------------
+// Device Identity
+// ----------------------------------------------------------------------------
+#define DEVICE_MODEL          "open-streamdeck"
+#define FIRMWARE_VERSION      "1.0.0"
+
+// ----------------------------------------------------------------------------
 // Bluetooth Classic Configuration
 // ----------------------------------------------------------------------------
 #define BT_DEVICE_NAME        "OpenStreamDeck"
@@ -23,7 +29,7 @@
 // ----------------------------------------------------------------------------
 // Button Configuration (active LOW with internal pull-up)
 // ----------------------------------------------------------------------------
-#define NUM_BUTTONS           12
+#define NUM_BUTTONS           10
 #define DEBOUNCE_MS           30      // Debounce interval in milliseconds
 #define LONG_PRESS_MS         600     // Long-press threshold
 
@@ -40,9 +46,7 @@ static const uint8_t BUTTON_PINS[NUM_BUTTONS] = {
     17,   // BTN 6
     18,   // BTN 7
     19,   // BTN 8
-    21,   // BTN 9
-    22,   // BTN 10
-    23    // BTN 11
+    21    // BTN 9
 };
 
 // ----------------------------------------------------------------------------
@@ -118,7 +122,7 @@ static const SliderConfig SLIDER_CONFIGS[NUM_SLIDERS] = {
 // ----------------------------------------------------------------------------
 // JSON Buffer Sizes
 // ----------------------------------------------------------------------------
-#define JSON_TX_BUFFER_SIZE   128     // Outgoing event buffer
+#define JSON_TX_BUFFER_SIZE   256     // Outgoing event/response buffer
 #define JSON_RX_BUFFER_SIZE   256     // Incoming command buffer
 #define SERIAL_RX_LINE_MAX    256     // Max incoming line length
 

@@ -53,11 +53,12 @@ static void onRawRx(const char* line) {
     // Dispatch to the registered command handler
     if (cmdCb) {
         const char* cmdName = cmdCb(line);
-        if (cmdName) {
+        if (cmdName && cmdName[0] != '\0') {
             sendAck(true, cmdName);
-        } else {
+        } else if (!cmdName) {
             sendAck(false, "unknown_command");
         }
+        // cmdName == "" means the handler already sent a custom response
     }
 }
 

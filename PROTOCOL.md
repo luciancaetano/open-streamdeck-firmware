@@ -109,6 +109,43 @@ Use the heartbeat to detect whether the deck is online. If no heartbeat is recei
 
 The host sends JSON commands to control the deck. Each command receives an ACK/NACK response.
 
+### Device Info Request
+
+Request the device model, firmware version, and hardware capabilities:
+
+```json
+{"cmd": "info"}
+```
+
+**Response:**
+```json
+{
+  "ack": true,
+  "cmd": "info",
+  "model": "open-streamdeck",
+  "firmware": "1.0.0",
+  "buttons": 12,
+  "knobs": 1,
+  "sliders": 1,
+  "leds": true,
+  "bluetooth": true,
+  "transport": "serial"
+}
+```
+
+| Field        | Type    | Description                                              |
+|--------------|---------|----------------------------------------------------------|
+| `model`      | string  | Device model identifier (e.g. `"open-streamdeck"`)       |
+| `firmware`   | string  | Firmware version in semver format (e.g. `"1.0.0"`)       |
+| `buttons`    | int     | Number of configured buttons                             |
+| `knobs`      | int     | Number of configured rotary encoders                     |
+| `sliders`    | int     | Number of configured sliders/faders                      |
+| `leds`       | boolean | `true` if LEDs are enabled in firmware                   |
+| `bluetooth`  | boolean | `true` if Bluetooth is enabled in firmware               |
+| `transport`  | string  | Current transport channel: `"serial"` or `"bluetooth"`   |
+
+The desktop app should send this command immediately after connection to identify the device and adapt its UI to the available hardware features.
+
 ### Single LED Control
 
 Set the color of the LED associated with a button:
@@ -200,6 +237,7 @@ Every command receives a response:
 
 | Command        | Example                        |
 |----------------|--------------------------------|
+| Device Info    | `{"cmd":"info"}`               |
 | Single LED     | `{"btn":3,"led":"red"}`        |
 | All LEDs       | `{"all_leds":"off"}`           |
 | Brightness     | `{"brightness":80}`            |
@@ -209,7 +247,11 @@ Every command receives a response:
 ## Full Session Example
 
 ```
-# Deck connects, host starts receiving heartbeats:
+# Deck connects, host requests device info:
+→ {"cmd":"info"}
+← {"ack":true,"cmd":"info","model":"open-streamdeck","firmware":"1.0.0","buttons":12,"knobs":1,"sliders":1,"leds":true,"bluetooth":true,"transport":"serial"}
+
+# Host starts receiving heartbeats:
 ← {"status":"alive","uptime":0,"bt":true}
 
 # Host sets button colors:
@@ -258,8 +300,9 @@ Legend: `→` = Host to Deck | `←` = Deck to Host
 ## App Implementation Notes
 
 1. **Connection**: Open the COM port (USB or Bluetooth SPP) at 115200 baud, 8N1.
-2. **Reading**: Read line by line (`\n` as delimiter). Each line is a complete JSON object.
-3. **Writing**: Send JSON commands terminated with `\n`.
-4. **Heartbeat**: Use as a connection indicator. Suggested timeout: 10s without heartbeat = disconnected.
-5. **Threading**: A separate thread for continuous serial reading with a queue/callback for event processing is recommended.
-6. **LEDs are optional**: If `LED_ENABLED=0` in the firmware, LED commands will be responded with `unknown_command`.
+2. **Device Discovery**: Immediately after connecting, send `{"cmd":"info"}` to identify the device model, firmware version, and available features. Use this to adapt the UI dynamically.
+3. **Reading**: Read line by line (`\n` as delimiter). Each line is a complete JSON object.
+4. **Writing**: Send JSON commands terminated with `\n`.
+5. **Heartbeat**: Use as a connection indicator. Suggested timeout: 10s without heartbeat = disconnected.
+6. **Threading**: A separate thread for continuous serial reading with a queue/callback for event processing is recommended.
+7. **LEDs are optional**: If `LED_ENABLED=0` in the firmware, LED commands will be responded with `unknown_command`. The `info` response will report `"leds": false`.

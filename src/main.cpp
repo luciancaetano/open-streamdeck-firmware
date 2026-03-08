@@ -75,6 +75,30 @@ static void onButtonEvent(const char* json) {
 static const char* onCommand(const char* json) {
     resetIdleTimer();
 
+    // Device info request: {"cmd":"info"}
+    {
+        StaticJsonDocument<JSON_RX_BUFFER_SIZE> doc;
+        if (deserializeJson(doc, json) == DeserializationError::Ok) {
+            if (doc.containsKey("cmd") && strcmp(doc["cmd"].as<const char*>(), "info") == 0) {
+                StaticJsonDocument<JSON_TX_BUFFER_SIZE> resp;
+                resp["ack"]       = true;
+                resp["cmd"]       = "info";
+                resp["model"]     = DEVICE_MODEL;
+                resp["firmware"]  = FIRMWARE_VERSION;
+                resp["buttons"]   = NUM_BUTTONS;
+                resp["knobs"]     = NUM_KNOBS;
+                resp["sliders"]   = NUM_SLIDERS;
+                resp["leds"]      = (bool)LED_ENABLED;
+                resp["bluetooth"] = comms_bt_connected();
+                resp["transport"] = comms_bt_connected() ? "bluetooth" : "serial";
+                char buf[JSON_TX_BUFFER_SIZE];
+                serializeJson(resp, buf);
+                comms_send_response(buf);
+                return "";  // Custom response already sent, skip auto-ACK
+            }
+        }
+    }
+
     // Try LED module
     const char* cmdName = leds_handle_command(json);
     if (cmdName) return cmdName;
