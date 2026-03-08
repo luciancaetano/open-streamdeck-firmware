@@ -97,3 +97,78 @@ static const uint8_t BUTTON_KEYS[NUM_BUTTONS] = {
 // ----------------------------------------------------------------------------
 #define IDLE_TIMEOUT_MS       300000  // 5 min idle before light sleep
 #define SLEEP_CHECK_INTERVAL  1000
+
+// ============================================================================
+// Alimentação por Bateria - ESP32 DOIT DevKit V1
+// ============================================================================
+//
+// CONSUMO DE CORRENTE (típico):
+//   BLE ativo + conectado:  ~80-130 mA
+//   BLE advertising (idle): ~100-150 mA
+//   Light sleep:            ~0.8 mA
+//   Deep sleep:             ~10 µA
+//
+// ────────────────────────────────────────────────────────────────────────────
+// OPÇÃO 1: Pino VIN (recomendado para simplicidade)
+// ────────────────────────────────────────────────────────────────────────────
+//   Tensão: 5V (mín 4.5V, máx 12V)
+//   O pino VIN alimenta o regulador AMS1117-3.3V onboard.
+//   Dropout ~1.2V, por isso precisa de no mínimo 4.5V.
+//
+//   Conexão:
+//     BAT+ ──→ Boost converter 5V ──→ VIN
+//     BAT- ──→ GND
+//
+//   Baterias compatíveis:
+//     - 1x LiPo 3.7V + módulo boost MT3608 (3.7V → 5V)
+//     - 1x 18650 3.7V + módulo boost MT3608 (3.7V → 5V)
+//     - Power bank USB 5V (via pino VIN ou cabo USB)
+//     - 4x pilhas AA (6V) direto no VIN
+//
+// ────────────────────────────────────────────────────────────────────────────
+// OPÇÃO 2: Pino 3V3 (mais eficiente, sem desperdício no regulador)
+// ────────────────────────────────────────────────────────────────────────────
+//   Tensão: 3.3V regulado (mín 3.0V, máx 3.6V)
+//   Conecta direto no barramento 3.3V, bypassa o regulador onboard.
+//   ⚠ NÃO conectar LiPo direto (4.2V carregada pode danificar o ESP32!)
+//
+//   Conexão:
+//     BAT+ ──→ LDO 3.3V (ex: AMS1117, HT7333, MCP1700) ──→ 3V3
+//     BAT- ──→ GND
+//
+//   Baterias compatíveis:
+//     - 1x LiPo 3.7V + LDO 3.3V (ex: HT7333, baixo dropout)
+//     - 1x 18650 3.7V + LDO 3.3V
+//     - 2x pilhas AA (3V) + LDO 3.3V (margem apertada)
+//
+// ────────────────────────────────────────────────────────────────────────────
+// OPÇÃO 3: USB (mais simples de todas)
+// ────────────────────────────────────────────────────────────────────────────
+//   Basta conectar um power bank USB no conector micro-USB da placa.
+//   Tensão: 5V via USB. Nenhuma modificação necessária.
+//
+// ────────────────────────────────────────────────────────────────────────────
+// DIAGRAMA DE CONEXÃO (Opção 1 - Boost 5V):
+// ────────────────────────────────────────────────────────────────────────────
+//
+//   ┌─────────┐     ┌────────────┐     ┌──────────────┐
+//   │  LiPo   │     │  MT3608    │     │  ESP32       │
+//   │  3.7V   ├──+──┤ IN+   OUT+ ├─────┤ VIN          │
+//   │         │  │  │            │     │              │
+//   │  GND  ──├──┴──┤ IN-   OUT- ├─────┤ GND          │
+//   └─────────┘     └────────────┘     └──────────────┘
+//                    (ajustar p/ 5V)
+//
+// ────────────────────────────────────────────────────────────────────────────
+// ESTIMATIVA DE DURAÇÃO:
+// ────────────────────────────────────────────────────────────────────────────
+//   Bateria 1000mAh LiPo, uso ativo ~100mA:
+//     ~8-10 horas de uso contínuo
+//     (considerando ~80% eficiência do boost/LDO)
+//
+//   Bateria 18650 2600mAh, uso ativo ~100mA:
+//     ~20-22 horas de uso contínuo
+//
+//   Com light sleep (IDLE_TIMEOUT_MS), duração aumenta significativamente
+//   quando o dispositivo não está sendo usado ativamente.
+// ============================================================================
