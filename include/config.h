@@ -81,6 +81,12 @@ static const uint8_t BUTTON_KEYS[NUM_BUTTONS] = {
 #define MULTI_CLICK_TIMEOUT   400     // ms to wait for additional clicks
 
 // ----------------------------------------------------------------------------
+// Status LED (onboard LED - GPIO2)
+// ----------------------------------------------------------------------------
+#define STATUS_LED_PIN        2       // LED embutido da ESP32 DevKit V1
+#define LED_BLINK_INTERVAL    500     // Piscar a cada 500ms quando desconectado
+
+// ----------------------------------------------------------------------------
 // Scan & Loop Timing
 // ----------------------------------------------------------------------------
 #define BUTTON_SCAN_INTERVAL  5       // Scan buttons every 5ms

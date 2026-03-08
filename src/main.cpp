@@ -26,6 +26,8 @@ static uint32_t lastButtonScan  = 0;
 static uint32_t lastEncoderScan = 0;
 static uint32_t lastSleepCheck  = 0;
 static uint32_t lastActivityMs  = 0;
+static uint32_t lastLedToggle   = 0;
+static bool     ledState        = false;
 
 static void resetIdleTimer() {
     lastActivityMs = millis();
@@ -107,6 +109,9 @@ void setup() {
     Serial.begin(115200);
     Serial.println("OpenDeck BLE HID starting...");
 
+    pinMode(STATUS_LED_PIN, OUTPUT);
+    digitalWrite(STATUS_LED_PIN, LOW);
+
     bleKeyboard.begin();
 
     buttons_init();
@@ -134,6 +139,20 @@ void loop() {
     if (now - lastEncoderScan >= ENCODER_SCAN_INTERVAL) {
         lastEncoderScan = now;
         knob_scan_rotation();
+    }
+
+    // Status LED: aceso fixo = conectado, piscando = desconectado
+    if (bleKeyboard.isConnected()) {
+        if (!ledState) {
+            ledState = true;
+            digitalWrite(STATUS_LED_PIN, HIGH);
+        }
+    } else {
+        if (now - lastLedToggle >= LED_BLINK_INTERVAL) {
+            lastLedToggle = now;
+            ledState = !ledState;
+            digitalWrite(STATUS_LED_PIN, ledState ? HIGH : LOW);
+        }
     }
 
     if (now - lastSleepCheck >= SLEEP_CHECK_INTERVAL) {
