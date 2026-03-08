@@ -4,113 +4,87 @@
 
 #include "knob.h"
 #include <ESP32Encoder.h>
-#include <ArduinoJson.h>
 
-// Per-knob runtime state
-struct KnobState {
-    ESP32Encoder encoder;
-    int64_t      lastCount;   // Last reported encoder count
-    // Push-button debounce (same approach as buttons module)
-    bool         pressed;
-    bool         lastRaw;
-    uint32_t     lastChangeMs;
-};
+static ESP32Encoder encoder;
+static int64_t lastCount = 0;
 
-static KnobState       knobs[NUM_KNOBS];
-static KnobEventCallback eventCb = nullptr;
+// Button multi-click state
+static bool     btnPressed    = false;
+static bool     btnLastRaw    = true;   // Idle HIGH (pull-up)
+static uint32_t btnLastChange = 0;
+static uint8_t  clickCount    = 0;
+static uint32_t lastReleaseMs = 0;
+static bool     waitingClicks = false;
 
-// ----------------------------------------------------------------------------
-// Public API
-// ----------------------------------------------------------------------------
+static KnobRotationCallback rotCb  = nullptr;
+static KnobClickCallback    clickCb = nullptr;
 
 void knob_init() {
     ESP32Encoder::useInternalWeakPullResistors = UP;
+    encoder.attachSingleEdge(ENCODER_PIN_A, ENCODER_PIN_B);
+    encoder.setCount(0);
+    lastCount = 0;
 
-    for (int i = 0; i < NUM_KNOBS; i++) {
-        const KnobConfig& cfg = KNOB_CONFIGS[i];
-
-        knobs[i].encoder.attachSingleEdge(cfg.pinA, cfg.pinB);
-        knobs[i].encoder.setCount(0);
-        knobs[i].lastCount = 0;
-
-        // Button init
-        pinMode(cfg.btnPin, INPUT_PULLUP);
-        knobs[i].pressed     = false;
-        knobs[i].lastRaw     = true;   // Idle HIGH (pull-up)
-        knobs[i].lastChangeMs = 0;
-    }
+    pinMode(ENCODER_BTN_PIN, INPUT_PULLUP);
 }
 
-void knob_set_callback(KnobEventCallback cb) {
-    eventCb = cb;
+void knob_set_rotation_callback(KnobRotationCallback cb) {
+    rotCb = cb;
+}
+
+void knob_set_click_callback(KnobClickCallback cb) {
+    clickCb = cb;
 }
 
 void knob_scan_rotation() {
-    for (int i = 0; i < NUM_KNOBS; i++) {
-        int64_t count = knobs[i].encoder.getCount();
-        int64_t delta = count - knobs[i].lastCount;
+    int64_t count = encoder.getCount();
+    int64_t delta = count - lastCount;
 
-        if (abs((int)delta) >= ENCODER_THRESHOLD) {
-            knobs[i].lastCount = count;
-
-            if (eventCb) {
-                StaticJsonDocument<JSON_TX_BUFFER_SIZE> doc;
-                doc["knob"]      = KNOB_CONFIGS[i].id;
-                doc["direction"] = (delta > 0) ? "up" : "down";
-                char buf[JSON_TX_BUFFER_SIZE];
-                serializeJson(doc, buf);
-                eventCb(buf);
-            }
+    if (abs((int)delta) >= ENCODER_THRESHOLD) {
+        lastCount = count;
+        if (rotCb) {
+            rotCb(delta > 0 ? 1 : -1);
         }
     }
 }
 
-void knob_scan_buttons() {
+void knob_scan_button() {
     uint32_t now = millis();
+    bool raw = !digitalRead(ENCODER_BTN_PIN);  // Active LOW
 
-    for (int i = 0; i < NUM_KNOBS; i++) {
-        bool raw = !digitalRead(KNOB_CONFIGS[i].btnPin);  // Active LOW
+    // Debounce
+    if (raw != btnLastRaw) {
+        btnLastRaw    = raw;
+        btnLastChange = now;
+    }
 
-        if (raw != knobs[i].lastRaw) {
-            knobs[i].lastRaw      = raw;
-            knobs[i].lastChangeMs = now;
+    if ((now - btnLastChange) >= ENCODER_DEBOUNCE_MS) {
+        if (raw && !btnPressed) {
+            // Press detected
+            btnPressed = true;
         }
-
-        if ((now - knobs[i].lastChangeMs) < ENCODER_DEBOUNCE_MS) continue;
-
-        if (raw && !knobs[i].pressed) {
-            knobs[i].pressed = true;
-
-            if (eventCb) {
-                StaticJsonDocument<JSON_TX_BUFFER_SIZE> doc;
-                doc["knob"]    = KNOB_CONFIGS[i].id;
-                doc["pressed"] = true;
-                char buf[JSON_TX_BUFFER_SIZE];
-                serializeJson(doc, buf);
-                eventCb(buf);
-            }
+        else if (!raw && btnPressed) {
+            // Release detected -> count this click
+            btnPressed    = false;
+            clickCount++;
+            lastReleaseMs = now;
+            waitingClicks = true;
         }
-        else if (!raw && knobs[i].pressed) {
-            knobs[i].pressed = false;
+    }
 
-            if (eventCb) {
-                StaticJsonDocument<JSON_TX_BUFFER_SIZE> doc;
-                doc["knob"]    = KNOB_CONFIGS[i].id;
-                doc["pressed"] = false;
-                char buf[JSON_TX_BUFFER_SIZE];
-                serializeJson(doc, buf);
-                eventCb(buf);
-            }
+    // Check if multi-click window has expired
+    if (waitingClicks && (now - lastReleaseMs) >= MULTI_CLICK_TIMEOUT) {
+        waitingClicks = false;
+        if (clickCb && clickCount > 0) {
+            clickCb(clickCount > 3 ? 3 : clickCount);
         }
+        clickCount = 0;
     }
 }
 
 uint64_t knob_get_wakeup_mask() {
-    uint64_t mask = 0;
-    for (int i = 0; i < NUM_KNOBS; i++) {
-        if (KNOB_CONFIGS[i].btnPin < 34) {
-            mask |= (1ULL << KNOB_CONFIGS[i].btnPin);
-        }
+    if (ENCODER_BTN_PIN < 34) {
+        return (1ULL << ENCODER_BTN_PIN);
     }
-    return mask;
+    return 0;
 }

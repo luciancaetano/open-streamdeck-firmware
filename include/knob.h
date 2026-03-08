@@ -1,34 +1,20 @@
 #pragma once
 // ============================================================================
-// Knob Module - Rotary encoder scanning, rotation & press events
+// Knob Module - Rotary encoder with volume control + multi-click detection
 // ============================================================================
 //
-// Supports NUM_KNOBS rotary encoders, each with CLK/DT/SW pins.
-// Generates JSON events:
-//   Rotation: {"knob": "<id>", "direction": "up|down"}
-//   Press:    {"knob": "<id>", "pressed": true|false}
-//
-// Designed for easy expansion: add entries to KNOB_CONFIGS in config.h.
+// Rotation: calls volume callback with direction (+1 = up, -1 = down)
+// Button:   detects multi-click (1=play/pause, 2=next, 3=prev)
 // ============================================================================
 
 #include "config.h"
 
-// Callback type: called with a serialized JSON string on knob events
-typedef void (*KnobEventCallback)(const char* json);
+typedef void (*KnobRotationCallback)(int direction);  // +1 or -1
+typedef void (*KnobClickCallback)(uint8_t clickCount); // 1, 2, or 3
 
-// Initialize encoder hardware and internal state for all knobs.
 void knob_init();
-
-// Register a callback for knob events.
-void knob_set_callback(KnobEventCallback cb);
-
-// Scan all knobs for rotation changes.
-// Should be called at ENCODER_SCAN_INTERVAL from the main loop.
+void knob_set_rotation_callback(KnobRotationCallback cb);
+void knob_set_click_callback(KnobClickCallback cb);
 void knob_scan_rotation();
-
-// Scan all knob push-buttons for press/release.
-// Can be called at BUTTON_SCAN_INTERVAL (shares the same timing).
-void knob_scan_buttons();
-
-// Return GPIO bitmask of all knob button pins (for sleep wakeup).
+void knob_scan_button();
 uint64_t knob_get_wakeup_mask();

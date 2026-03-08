@@ -1,167 +1,126 @@
 // ============================================================================
-// Open StreamDeck Firmware - Main Entry Point
-// ESP32 DOIT DevKit V1 | 12 Buttons + Rotary Encoder + BT/USB Serial
+// Open StreamDeck Firmware - BLE HID Macro Keyboard
+// ESP32 DOIT DevKit V1 | 8 Buttons + Rotary Encoder (Volume + Media)
 // ============================================================================
 //
-// This file wires all modules together:
-//   buttons  -> scans physical buttons, emits JSON events
-//   knob     -> scans rotary encoders, emits JSON events
-//   slider   -> scans analog faders, emits JSON events
-//   comms    -> centralized protocol layer (encode, decode, ACK, routing)
-//   leds     -> RGB LED feedback and host-driven color control
-//
-// The main loop is non-blocking and timer-gated for each subsystem.
+// Buttons:  Send F13-F20 key press/release via BLE HID
+// Encoder:  Rotate = Volume Up/Down
+// Enc Btn:  1 click = Play/Pause, 2 clicks = Next Track, 3 clicks = Prev Track
 // ============================================================================
 
 #include <Arduino.h>
+#include <BleKeyboard.h>
 #include "config.h"
 #include "buttons.h"
 #include "knob.h"
-#include "slider.h"
-#include "comms.h"
-#include "leds.h"
-#include <ArduinoJson.h>
+
+// ----------------------------------------------------------------------------
+// BLE Keyboard instance
+// ----------------------------------------------------------------------------
+BleKeyboard bleKeyboard(DEVICE_NAME, DEVICE_MANUFACTURER, 100);
 
 // ----------------------------------------------------------------------------
 // Timing State
 // ----------------------------------------------------------------------------
 static uint32_t lastButtonScan  = 0;
 static uint32_t lastEncoderScan = 0;
-static uint32_t lastSliderScan  = 0;
-static uint32_t lastLedUpdate   = 0;
-static uint32_t lastSerialRx    = 0;
-static uint32_t lastHeartbeat   = 0;
 static uint32_t lastSleepCheck  = 0;
 static uint32_t lastActivityMs  = 0;
 
-// Heartbeat uptime tracking (survives millis() wrap)
-static uint32_t uptimeSeconds   = 0;
-static uint32_t lastUptimeTick  = 0;
-
-// ----------------------------------------------------------------------------
-// Idle Timer
-// ----------------------------------------------------------------------------
 static void resetIdleTimer() {
     lastActivityMs = millis();
 }
 
 // ----------------------------------------------------------------------------
-// Event Dispatch: send via comms and reset idle timer
+// Button callback: send HID key press/release
 // ----------------------------------------------------------------------------
-static void onInputEvent(const char* json) {
+static void onButton(uint8_t index, ButtonAction action) {
+    if (!bleKeyboard.isConnected()) return;
     resetIdleTimer();
-    comms_send_event(json);
-}
 
-// ----------------------------------------------------------------------------
-// Button event handler: forward event + trigger LED flash on press
-// ----------------------------------------------------------------------------
-static void onButtonEvent(const char* json) {
-    onInputEvent(json);
-
-    // Flash the corresponding LED on press
-    StaticJsonDocument<JSON_TX_BUFFER_SIZE> doc;
-    if (deserializeJson(doc, json) == DeserializationError::Ok) {
-        if (doc.containsKey("btn") && doc["action"] == "pressed") {
-            leds_flash_button(doc["btn"].as<int>());
-        }
+    uint8_t key = BUTTON_KEYS[index];
+    if (action == BTN_PRESSED) {
+        bleKeyboard.press(key);
+    } else {
+        bleKeyboard.release(key);
     }
 }
 
 // ----------------------------------------------------------------------------
-// Command Handler: try each module, return command name or nullptr.
-// Comms layer handles JSON parsing and ACK generation automatically.
+// Encoder rotation callback: volume up/down
 // ----------------------------------------------------------------------------
-static const char* onCommand(const char* json) {
+static void onRotation(int direction) {
+    if (!bleKeyboard.isConnected()) return;
     resetIdleTimer();
 
-    // Device info request: {"cmd":"info"}
-    {
-        StaticJsonDocument<JSON_RX_BUFFER_SIZE> doc;
-        if (deserializeJson(doc, json) == DeserializationError::Ok) {
-            if (doc.containsKey("cmd") && strcmp(doc["cmd"].as<const char*>(), "info") == 0) {
-                StaticJsonDocument<JSON_TX_BUFFER_SIZE> resp;
-                resp["ack"]       = true;
-                resp["cmd"]       = "info";
-                resp["model"]     = DEVICE_MODEL;
-                resp["firmware"]  = FIRMWARE_VERSION;
-                resp["buttons"]   = NUM_BUTTONS;
-                resp["knobs"]     = NUM_KNOBS;
-                resp["sliders"]   = NUM_SLIDERS;
-                resp["leds"]      = (bool)LED_ENABLED;
-                resp["bluetooth"] = comms_bt_connected();
-                resp["transport"] = comms_bt_connected() ? "bluetooth" : "serial";
-                char buf[JSON_TX_BUFFER_SIZE];
-                serializeJson(resp, buf);
-                comms_send_response(buf);
-                return "";  // Custom response already sent, skip auto-ACK
-            }
-        }
+    if (direction > 0) {
+        bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
+    } else {
+        bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
     }
+}
 
-    // Try LED module
-    const char* cmdName = leds_handle_command(json);
-    if (cmdName) return cmdName;
+// ----------------------------------------------------------------------------
+// Encoder button multi-click callback: media controls
+// ----------------------------------------------------------------------------
+static void onEncoderClick(uint8_t clickCount) {
+    if (!bleKeyboard.isConnected()) return;
+    resetIdleTimer();
 
-    // Future modules go here:
-    // cmdName = macros_handle_command(json);
-    // if (cmdName) return cmdName;
-
-    return nullptr;  // Comms will send {"ack":false,"error":"unknown_command"}
+    switch (clickCount) {
+        case 1:
+            bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+            break;
+        case 2:
+            bleKeyboard.write(KEY_MEDIA_NEXT_TRACK);
+            break;
+        case 3:
+            bleKeyboard.write(KEY_MEDIA_PREVIOUS_TRACK);
+            break;
+    }
 }
 
 // ----------------------------------------------------------------------------
 // Power Management
 // ----------------------------------------------------------------------------
 static void checkIdleSleep() {
-    if (comms_bt_connected()) return;
-    if (Serial.available()) return;
+    if (bleKeyboard.isConnected()) return;
 
     uint32_t idleMs = millis() - lastActivityMs;
     if (idleMs < IDLE_TIMEOUT_MS) return;
 
-    // Prepare for light sleep
-    leds_sleep();
-
-    // Build wakeup GPIO mask from buttons + knob buttons
     uint64_t gpioMask = buttons_get_wakeup_mask() | knob_get_wakeup_mask();
     if (gpioMask) {
         esp_sleep_enable_ext1_wakeup(gpioMask, ESP_EXT1_WAKEUP_ALL_LOW);
     }
-    // Timer wakeup as safety net (e.g. BLE reconnect check)
-    esp_sleep_enable_timer_wakeup(5000000);  // 5 seconds
-
+    esp_sleep_enable_timer_wakeup(5000000);  // 5s safety net
     esp_light_sleep_start();
 
-    // -- Woke up --
+    // Woke up
     resetIdleTimer();
-    leds_wake();
 }
 
 // ============================================================================
 // Setup
 // ============================================================================
 void setup() {
-    comms_init();           // Initializes USB + BLE transports
+    Serial.begin(115200);
+    Serial.println("OpenDeck BLE HID starting...");
+
+    bleKeyboard.begin();
+
     buttons_init();
     knob_init();
-    slider_init();
-    leds_init();
 
-    // Wire input event callbacks
-    buttons_set_callback(onButtonEvent);
-    knob_set_callback(onInputEvent);
-    slider_set_callback(onInputEvent);
-
-    // Wire command handler (comms handles parse + ACK around it)
-    comms_set_command_callback(onCommand);
+    buttons_set_callback(onButton);
+    knob_set_rotation_callback(onRotation);
+    knob_set_click_callback(onEncoderClick);
 
     lastActivityMs = millis();
-    lastUptimeTick = millis();
 }
 
 // ============================================================================
-// Main Loop - Non-blocking, timer-gated
+// Main Loop
 // ============================================================================
 void loop() {
     uint32_t now = millis();
@@ -169,37 +128,12 @@ void loop() {
     if (now - lastButtonScan >= BUTTON_SCAN_INTERVAL) {
         lastButtonScan = now;
         buttons_scan();
-        knob_scan_buttons();
+        knob_scan_button();
     }
 
     if (now - lastEncoderScan >= ENCODER_SCAN_INTERVAL) {
         lastEncoderScan = now;
         knob_scan_rotation();
-    }
-
-    if (now - lastSliderScan >= SLIDER_SCAN_INTERVAL) {
-        lastSliderScan = now;
-        slider_scan();
-    }
-
-    if (now - lastSerialRx >= SERIAL_RX_INTERVAL) {
-        lastSerialRx = now;
-        comms_process_rx();
-    }
-
-#if LED_ENABLED
-    if (now - lastLedUpdate >= LED_UPDATE_INTERVAL) {
-        lastLedUpdate = now;
-        leds_update();
-    }
-#endif
-
-    if (now - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
-        lastHeartbeat = now;
-        // Accumulate elapsed seconds (handles millis wrap)
-        uptimeSeconds += (now - lastUptimeTick) / 1000;
-        lastUptimeTick = now;
-        comms_send_heartbeat(uptimeSeconds);
     }
 
     if (now - lastSleepCheck >= SLEEP_CHECK_INTERVAL) {
