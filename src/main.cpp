@@ -1,11 +1,12 @@
 // ============================================================================
 // Open StreamDeck Firmware - BLE HID Macro Keyboard
-// ESP32 DOIT DevKit V1 | 9 Buttons + Rotary Encoder (Volume + Media)
+// ESP32 DOIT DevKit V1 | 10 Buttons + Rotary Encoder
 // ============================================================================
 //
-// Buttons:  Send F13-F21 key press/release via BLE HID
-// Encoder:  Rotate = Volume Up/Down
-// Enc Btn:  1 click = Play/Pause, 2 clicks = Next Track, 3 clicks = Prev Track
+// Buttons 0-8:  Otemu switches → F13-F21 via BLE HID
+// Button 9:     Encoder push button (press/release)
+// Encoder:      Rotate = Volume Up/Down
+// Enc Btn:      1 click = Play/Pause, 2x = Next, 3x = Prev
 // ============================================================================
 
 #include <Arduino.h>
@@ -13,6 +14,7 @@
 #include "config.h"
 #include "buttons.h"
 #include "knob.h"
+#include "serial_protocol.h"
 
 // ----------------------------------------------------------------------------
 // BLE Keyboard instance
@@ -37,28 +39,50 @@ static void resetIdleTimer() {
 // Button callback: send HID key press/release
 // ----------------------------------------------------------------------------
 static void onButton(uint8_t index, ButtonAction action) {
-    if (!bleKeyboard.isConnected()) return;
     resetIdleTimer();
 
-    uint8_t key = BUTTON_KEYS[index];
-    if (action == BTN_PRESSED) {
-        bleKeyboard.press(key);
-    } else {
-        bleKeyboard.release(key);
+    // Serial protocol: send binary event to host
+    proto_send_btn_event(index, action == BTN_PRESSED ? ACTION_PRESSED : ACTION_RELEASED);
+
+    // BLE HID: send key if connected and no serial host
+    if (!proto_host_connected() && bleKeyboard.isConnected()) {
+        uint8_t key = BUTTON_KEYS[index];
+        if (action == BTN_PRESSED) {
+            bleKeyboard.press(key);
+        } else {
+            bleKeyboard.release(key);
+        }
     }
+}
+
+// ----------------------------------------------------------------------------
+// Encoder button press/release callback (button index 9)
+// ----------------------------------------------------------------------------
+static void onEncoderButton(bool pressed) {
+    resetIdleTimer();
+
+    // Serial protocol: encoder button = index 9
+    proto_send_btn_event(NUM_BUTTONS, pressed ? ACTION_PRESSED : ACTION_RELEASED);
+
+    // BLE HID: no individual key for encoder press/release (handled by multi-click)
 }
 
 // ----------------------------------------------------------------------------
 // Encoder rotation callback: volume up/down
 // ----------------------------------------------------------------------------
 static void onRotation(int direction) {
-    if (!bleKeyboard.isConnected()) return;
     resetIdleTimer();
 
-    if (direction > 0) {
-        bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
-    } else {
-        bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
+    // Serial protocol
+    proto_send_knob_rotate(direction);
+
+    // BLE HID fallback
+    if (!proto_host_connected() && bleKeyboard.isConnected()) {
+        if (direction > 0) {
+            bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
+        } else {
+            bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
+        }
     }
 }
 
@@ -66,19 +90,24 @@ static void onRotation(int direction) {
 // Encoder button multi-click callback: media controls
 // ----------------------------------------------------------------------------
 static void onEncoderClick(uint8_t clickCount) {
-    if (!bleKeyboard.isConnected()) return;
     resetIdleTimer();
 
-    switch (clickCount) {
-        case 1:
-            bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
-            break;
-        case 2:
-            bleKeyboard.write(KEY_MEDIA_NEXT_TRACK);
-            break;
-        case 3:
-            bleKeyboard.write(KEY_MEDIA_PREVIOUS_TRACK);
-            break;
+    // Serial protocol
+    proto_send_knob_click(clickCount);
+
+    // BLE HID fallback
+    if (!proto_host_connected() && bleKeyboard.isConnected()) {
+        switch (clickCount) {
+            case 1:
+                bleKeyboard.write(KEY_MEDIA_PLAY_PAUSE);
+                break;
+            case 2:
+                bleKeyboard.write(KEY_MEDIA_NEXT_TRACK);
+                break;
+            case 3:
+                bleKeyboard.write(KEY_MEDIA_PREVIOUS_TRACK);
+                break;
+        }
     }
 }
 
@@ -107,11 +136,11 @@ static void checkIdleSleep() {
 // ============================================================================
 void setup() {
     Serial.begin(115200);
-    Serial.println("OpenDeck BLE HID starting...");
 
     pinMode(STATUS_LED_PIN, OUTPUT);
     digitalWrite(STATUS_LED_PIN, LOW);
 
+    proto_init();
     bleKeyboard.begin();
 
     buttons_init();
@@ -119,6 +148,7 @@ void setup() {
 
     buttons_set_callback(onButton);
     knob_set_rotation_callback(onRotation);
+    knob_set_button_callback(onEncoderButton);
     knob_set_click_callback(onEncoderClick);
 
     lastActivityMs = millis();
@@ -140,6 +170,9 @@ void loop() {
         lastEncoderScan = now;
         knob_scan_rotation();
     }
+
+    // Process incoming serial commands
+    proto_process();
 
     // Status LED: aceso fixo = conectado, piscando = desconectado
     if (bleKeyboard.isConnected()) {

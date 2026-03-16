@@ -2,7 +2,7 @@
 // ============================================================================
 // Open StreamDeck - Configuration
 // ESP32 DOIT DevKit V1 | BLE HID Macro Keyboard
-// 9 Buttons + 1 Rotary Encoder (volume + multi-click media control)
+// 10 Buttons (9 Otemu switches + 1 encoder button) + 1 Rotary Encoder
 // ============================================================================
 
 #include <Arduino.h>
@@ -13,6 +13,10 @@
 #define DEVICE_NAME           "OpenDeck"
 #define DEVICE_MANUFACTURER   "OpenDeck"
 #define FIRMWARE_VERSION      "2.0.0"
+#define DEVICE_HARDWARE_ID    "ODK10K1"   // 8-char unique hardware identifier
+                                          // Format: ODK + total buttons + K + knob count
+                                          // 10 buttons (9 Otemu + 1 encoder btn), 1 knob
+                                          // Used for auto-discovery on serial ports
 
 // ----------------------------------------------------------------------------
 // Button Configuration (active LOW with internal pull-up)
@@ -97,6 +101,12 @@ static const uint8_t BUTTON_KEYS[NUM_BUTTONS] = {
 // ----------------------------------------------------------------------------
 #define BUTTON_SCAN_INTERVAL  5       // Scan buttons every 5ms
 #define ENCODER_SCAN_INTERVAL 2       // Read encoder every 2ms
+
+// ----------------------------------------------------------------------------
+// Serial Protocol
+// ----------------------------------------------------------------------------
+#define PROTO_HEARTBEAT_INTERVAL_MS  3000    // Send heartbeat every 3s
+#define PROTO_HOST_TIMEOUT_MS        10000   // Host considered gone after 10s
 
 // ----------------------------------------------------------------------------
 // Power Management

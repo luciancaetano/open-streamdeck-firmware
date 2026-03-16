@@ -16,7 +16,8 @@ static uint8_t  clickCount    = 0;
 static uint32_t lastReleaseMs = 0;
 static bool     waitingClicks = false;
 
-static KnobRotationCallback rotCb  = nullptr;
+static KnobRotationCallback rotCb   = nullptr;
+static KnobButtonCallback   btnCb   = nullptr;
 static KnobClickCallback    clickCb = nullptr;
 
 void knob_init() {
@@ -30,6 +31,10 @@ void knob_init() {
 
 void knob_set_rotation_callback(KnobRotationCallback cb) {
     rotCb = cb;
+}
+
+void knob_set_button_callback(KnobButtonCallback cb) {
+    btnCb = cb;
 }
 
 void knob_set_click_callback(KnobClickCallback cb) {
@@ -62,10 +67,12 @@ void knob_scan_button() {
         if (raw && !btnPressed) {
             // Press detected
             btnPressed = true;
+            if (btnCb) btnCb(true);
         }
         else if (!raw && btnPressed) {
             // Release detected -> count this click
             btnPressed    = false;
+            if (btnCb) btnCb(false);
             clickCount++;
             lastReleaseMs = now;
             waitingClicks = true;
