@@ -1,9 +1,9 @@
 // ============================================================================
 // Open StreamDeck Firmware - BLE HID Macro Keyboard
-// ESP32 DOIT DevKit V1 | 8 Buttons + Rotary Encoder (Volume + Media)
+// ESP32 DOIT DevKit V1 | 9 Buttons + Rotary Encoder (Volume + Media)
 // ============================================================================
 //
-// Buttons:  Send F13-F20 key press/release via BLE HID
+// Buttons:  Send F13-F21 key press/release via BLE HID
 // Encoder:  Rotate = Volume Up/Down
 // Enc Btn:  1 click = Play/Pause, 2 clicks = Next Track, 3 clicks = Prev Track
 // ============================================================================
