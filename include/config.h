@@ -86,6 +86,11 @@ static const uint8_t BUTTON_KEYS[NUM_BUTTONS] = {
 #define ENCODER_THRESHOLD     1       // Minimum count delta to register a tick
 
 // ----------------------------------------------------------------------------
+// Knob disable option
+// ----------------------------------------------------------------------------
+#define DISABLE_KNOB        // Uncomment to disable rotary encoder and encoder button support
+
+// ----------------------------------------------------------------------------
 // Multi-Click Detection (encoder button)
 // ----------------------------------------------------------------------------
 #define MULTI_CLICK_TIMEOUT   400     // ms to wait for additional clicks

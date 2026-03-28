@@ -120,7 +120,11 @@ static void checkIdleSleep() {
     uint32_t idleMs = millis() - lastActivityMs;
     if (idleMs < IDLE_TIMEOUT_MS) return;
 
+#ifndef DISABLE_KNOB
     uint64_t gpioMask = buttons_get_wakeup_mask() | knob_get_wakeup_mask();
+#else
+    uint64_t gpioMask = buttons_get_wakeup_mask();
+#endif
     if (gpioMask) {
         esp_sleep_enable_ext1_wakeup(gpioMask, ESP_EXT1_WAKEUP_ALL_LOW);
     }
@@ -144,12 +148,16 @@ void setup() {
     bleKeyboard.begin();
 
     buttons_init();
+#ifndef DISABLE_KNOB
     knob_init();
+#endif
 
     buttons_set_callback(onButton);
+#ifndef DISABLE_KNOB
     knob_set_rotation_callback(onRotation);
     knob_set_button_callback(onEncoderButton);
     knob_set_click_callback(onEncoderClick);
+#endif
 
     lastActivityMs = millis();
 }
@@ -163,12 +171,16 @@ void loop() {
     if (now - lastButtonScan >= BUTTON_SCAN_INTERVAL) {
         lastButtonScan = now;
         buttons_scan();
+#ifndef DISABLE_KNOB
         knob_scan_button();
+#endif
     }
 
     if (now - lastEncoderScan >= ENCODER_SCAN_INTERVAL) {
         lastEncoderScan = now;
+#ifndef DISABLE_KNOB
         knob_scan_rotation();
+#endif
     }
 
     // Process incoming serial commands

@@ -5,6 +5,8 @@
 #include "knob.h"
 #include <ESP32Encoder.h>
 
+#ifndef DISABLE_KNOB
+
 static ESP32Encoder encoder;
 static int64_t lastCount = 0;
 
@@ -95,3 +97,35 @@ uint64_t knob_get_wakeup_mask() {
     }
     return 0;
 }
+
+#else
+
+void knob_init() {
+    // Knob disabled by DISABLE_KNOB
+}
+
+void knob_set_rotation_callback(KnobRotationCallback cb) {
+    (void)cb;
+}
+
+void knob_set_button_callback(KnobButtonCallback cb) {
+    (void)cb;
+}
+
+void knob_set_click_callback(KnobClickCallback cb) {
+    (void)cb;
+}
+
+void knob_scan_rotation() {
+    // Knob disabled
+}
+
+void knob_scan_button() {
+    // Knob disabled
+}
+
+uint64_t knob_get_wakeup_mask() {
+    return 0;
+}
+
+#endif
