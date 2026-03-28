@@ -46,11 +46,26 @@ static void onButton(uint8_t index, ButtonAction action) {
 
     // BLE HID: send key if connected and no serial host
     if (!proto_host_connected() && bleKeyboard.isConnected()) {
-        uint8_t key = BUTTON_KEYS[index];
-        if (action == BTN_PRESSED) {
-            bleKeyboard.press(key);
+        // Button mapping: BTN0 -> Ctrl+Alt+F1, BTN1 -> Ctrl+Alt+F2, etc.
+        if (index < NUM_BUTTONS) {
+            uint8_t fnKey = KEY_F1 + index;
+            if (action == BTN_PRESSED) {
+                bleKeyboard.press(KEY_LEFT_CTRL);
+                bleKeyboard.press(KEY_LEFT_ALT);
+                bleKeyboard.press(fnKey);
+            } else {
+                bleKeyboard.release(fnKey);
+                bleKeyboard.release(KEY_LEFT_ALT);
+                bleKeyboard.release(KEY_LEFT_CTRL);
+            }
         } else {
-            bleKeyboard.release(key);
+            // Fallback to configured key map (F13-F21)
+            uint8_t key = BUTTON_KEYS[index];
+            if (action == BTN_PRESSED) {
+                bleKeyboard.press(key);
+            } else {
+                bleKeyboard.release(key);
+            }
         }
     }
 }
